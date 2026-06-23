@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Saison DeLux – Outil de soumission</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #1a2744;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --slate: #4a5568;
+    --smoke: #f7f8fa;
+    --border: #dde1ea;
+    --red: #c0392b;
+    --green: #27ae60;
+    --white: #ffffff;
+    --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+  body { font-family: var(--font); background: var(--smoke); color: var(--navy); min-height: 100vh; }
+
+  /* ===== LOGIN SCREEN ===== */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; background: var(--navy);
+    flex-direction: column; gap: 24px;
+  }
+  #login-screen .lock-icon { font-size: 48px; }
+  #login-screen h1 { color: var(--gold); font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
+  #login-screen p { color: rgba(255,255,255,0.6); font-size: 14px; }
+  #login-box {
+    background: white; border-radius: 12px; padding: 32px; width: 320px;
+    display: flex; flex-direction: column; gap: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  #login-box label { font-size: 13px; font-weight: 600; color: var(--navy); }
+  #login-box input {
+    width: 100%; padding: 12px 16px; border: 2px solid var(--border);
+    border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s;
+  }
+  #login-box input:focus { border-color: var(--gold); }
+  #login-btn {
+    background: var(--gold); color: var(--navy); font-weight: 700; font-size: 15px;
+    padding: 13px; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s;
+  }
+  #login-btn:hover { background: var(--gold-light); }
+  #login-error { color: var(--red); font-size: 13px; text-align: center; display: none; }
+
+  /* ===== APP SHELL ===== */
+  #app { display: none; }
+  .app-header {
+    background: var(--navy); color: white; padding: 0 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    height: 60px; box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .app-header .brand { display: flex; align-items: center; gap: 10px; }
+  .app-header .brand-name { font-weight: 700; font-size: 16px; color: var(--gold); }
+  .app-header .brand-sub { font-size: 11px; color: rgba(255,255,255,0.5); }
+  #logout-btn {
+    background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.7);
+    padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    transition: all 0.2s;
+  }
+  #logout-btn:hover { background: rgba(255,255,255,0.1); color: white; }
+
+  /* ===== MAIN LAYOUT ===== */
+  .main { max-width: 900px; margin: 0 auto; padding: 24px 16px; }
+
+  /* ===== CARDS ===== */
+  .card {
+    background: white; border-radius: 12px; border: 1px solid var(--border);
+    margin-bottom: 20px; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  .card-header {
+    background: var(--navy); color: white; padding: 14px 20px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .card-header h2 { font-size: 14px; font-weight: 600; letter-spacing: 0.3px; }
+  .card-header .step-badge {
+    background: var(--gold); color: var(--navy); border-radius: 50%;
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 800; flex-shrink: 0;
+  }
+  .card-body { padding: 20px; }
+
+  /* ===== FORM ELEMENTS ===== */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group.full { grid-column: 1 / -1; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--slate); text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input, .form-group select, .form-group textarea {
+    padding: 11px 14px; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 15px; font-family: var(--font); color: var(--navy); outline: none;
+    transition: border-color 0.2s; background: var(--smoke);
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: var(--gold); background: white;
+  }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+
+  /* ===== SERVICE TOGGLES ===== */
+  .service-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .service-toggle {
+    border: 2px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 12px;
+    background: var(--smoke);
+  }
+  .service-toggle:hover { border-color: var(--gold); background: white; }
+  .service-toggle.active { border-color: var(--navy); background: var(--navy); color: white; }
+  .service-toggle.active .service-icon { color: var(--gold); }
+  .service-toggle input[type="checkbox"] { display: none; }
+  .service-icon { font-size: 22px; }
+  .service-label { font-size: 13px; font-weight: 600; line-height: 1.3; }
+
+  /* ===== ZONES ===== */
+  .zone-row {
+    display: grid; grid-template-columns: 1fr 120px 40px; gap: 10px;
+    align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .zone-row:last-child { border-bottom: none; }
+  .zone-name { font-size: 14px; color: var(--navy); }
+  .zone-sqft input {
+    padding: 8px 12px; border: 2px solid var(--border); border-radius: 8px;
+    font-size: 14px; width: 100%; outline: none; text-align: right;
+    background: var(--smoke); color: var(--navy);
+  }
+  .zone-sqft input:focus { border-color: var(--gold); background: white; }
+  .zone-del {
+    background: none; border: none; color: var(--red); cursor: pointer;
+    font-size: 18px; opacity: 0.6; transition: opacity 0.2s;
+  }
+  .zone-del:hover { opacity: 1; }
+  #add-zone-btn {
+    margin-top: 12px; background: none; border: 2px dashed var(--border);
+    color: var(--slate); padding: 10px; width: 100%; border-radius: 8px;
+    cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;
+  }
+  #add-zone-btn:hover { border-color: var(--gold); color: var(--navy); }
+
+  /* ===== PRICING SUMMARY ===== */
+  .price-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .price-table tr { border-bottom: 1px solid var(--border); }
+  .price-table tr:last-child { border-bottom: none; }
+  .price-table td { padding: 10px 4px; }
+  .price-table td:last-child { text-align: right; font-weight: 600; }
+  .price-table .section-header td {
+    font-size: 11px; font-weight: 700; color: var(--slate); text-transform: uppercase;
+    letter-spacing: 0.5px; padding-top: 16px; padding-bottom: 6px; border-bottom: 2px solid var(--border);
+  }
+  .price-table .total-row td {
+    font-size: 17px; font-weight: 800; color: var(--navy); padding-top: 14px;
+  }
+  .price-table .deposit-row td { font-size: 13px; color: var(--slate); }
+  .price-highlight { font-size: 32px; font-weight: 800; color: var(--navy); }
+  .price-sub { font-size: 13px; color: var(--slate); }
+  .total-display {
+    background: linear-gradient(135deg, var(--navy), #253560);
+    color: white; border-radius: 12px; padding: 20px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .total-display .label { font-size: 13px; color: rgba(255,255,255,0.65); font-weight: 600; }
+  .total-display .amount { font-size: 36px; font-weight: 800; color: var(--gold-light); }
+  .deposit-info { display: flex; gap: 12px; margin-top: 12px; }
+  .deposit-pill {
+    flex: 1; background: var(--smoke); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 16px; text-align: center;
+  }
+  .deposit-pill .pill-label { font-size: 11px; color: var(--slate); font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+  .deposit-pill .pill-amount { font-size: 20px; font-weight: 700; color: var(--navy); margin-top: 2px; }
+
+  /* ===== GENERATE BUTTON ===== */
+  #generate-btn {
+    width: 100%; padding: 16px; background: var(--gold); color: var(--navy);
+    border: none; border-radius: 10px; font-size: 16px; font-weight: 800;
+    cursor: pointer; letter-spacing: 0.3px; transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  #generate-btn:hover { background: var(--gold-light); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(201,168,76,0.4); }
+  #generate-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* ===== INFO CHIPS ===== */
+  .info-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .info-chip {
+    background: var(--smoke); border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 10px; font-size: 12px; color: var(--slate);
+    display: flex; align-items: center; gap: 5px;
+  }
+  .info-chip strong { color: var(--navy); }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 600px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .total-display { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .total-display .amount { font-size: 28px; }
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="login-screen">
+  <div class="lock-icon">🔐</div>
+  <h1>Saison DeLux</h1>
+  <p>Outil de soumission — Représentants</p>
+  <div id="login-box">
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input type="password" id="pw-input" placeholder="Entrez le mot de passe" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button id="login-btn" onclick="doLogin()">Accéder →</button>
+    <div id="login-error">Mot de passe incorrect. Réessayez.</div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div id="app">
+  <div class="app-header">
+    <div class="brand">
+      <div>
+        <div class="brand-name">Saison DeLux</div>
+        <div class="brand-sub">Outil de soumission</div>
+      </div>
+    </div>
+    <button id="logout-btn" onclick="doLogout()">Déconnexion</button>
+  </div>
+
+  <div class="main">
+
+    <!-- STEP 1: CLIENT INFO -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-badge">1</div>
+        <h2>Informations du client</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Nom du client</label>
+            <input type="text" id="client-name" placeholder="Prénom et nom" oninput="updatePreview()">
+          </div>
+          <div class="form-group">
+            <label>Adresse complète</label>
+            <input type="text" id="client-address" placeholder="123 rue Exemple, Brossard" oninput="updatePreview()">
+          </div>
+          <div class="form-group">
+            <label>Date de la soumission</label>
+            <input type="date" id="quote-date" oninput="updatePreview()">
+          </div>
+          <div class="form-group">
+            <label>Notes pour le client (optionnel)</label>
+            <input type="text" id="client-notes" placeholder="Ex: accès par côté garage" oninput="updatePreview()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: SERVICES -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-badge">2</div>
+        <h2>Services inclus</h2>
+      </div>
+      <div class="card-body">
+        <div class="service-grid">
+          <label class="service-toggle active" id="toggle-wash">
+            <input type="checkbox" id="svc-wash" checked onchange="toggleService('wash'); updateCalc()">
+            <span class="service-icon">💧</span>
+            <div><div class="service-label">Lavage sous pression</div></div>
+          </label>
+          <label class="service-toggle active" id="toggle-sand">
+            <input type="checkbox" id="svc-sand" checked onchange="toggleService('sand'); updateCalc()">
+            <span class="service-icon">🪨</span>
+            <div><div class="service-label">Sable polymère</div></div>
+          </label>
+          <label class="service-toggle" id="toggle-sealer">
+            <input type="checkbox" id="svc-sealer" onchange="toggleService('sealer'); updateCalc()">
+            <span class="service-icon">✨</span>
+            <div><div class="service-label">Application d'apprêt acrylique</div></div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: ZONES -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-badge">3</div>
+        <h2>Zones & superficie</h2>
+      </div>
+      <div class="card-body">
+        <div id="zones-list">
+          <!-- zones injected by JS -->
+        </div>
+        <button id="add-zone-btn" onclick="addZone()">+ Ajouter une zone</button>
+        <div class="info-row" id="zone-summary"></div>
+      </div>
+    </div>
+
+    <!-- STEP 4: PRICING SUMMARY -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-badge">4</div>
+        <h2>Récapitulatif du prix</h2>
+      </div>
+      <div class="card-body">
+        <div class="total-display">
+          <div>
+            <div class="label">TOTAL DU PROJET</div>
+            <div class="amount" id="total-display">0,00 $</div>
+          </div>
+          <div style="text-align:right">
+            <div class="label">TPS/TVQ incluses</div>
+            <div style="color: rgba(255,255,255,0.4); font-size:11px; margin-top:2px">discuté sur place</div>
+          </div>
+        </div>
+        <div class="deposit-info">
+          <div class="deposit-pill">
+            <div class="pill-label">Dépôt (50%)</div>
+            <div class="pill-amount" id="deposit-display">0,00 $</div>
+          </div>
+          <div class="deposit-pill">
+            <div class="pill-label">Solde à la fin</div>
+            <div class="pill-amount" id="balance-display">0,00 $</div>
+          </div>
+        </div>
+        <div id="price-breakdown" style="margin-top:20px;"></div>
+      </div>
+    </div>
+
+    <!-- GENERATE -->
+    <button id="generate-btn" onclick="generatePDF()">
+      📄 Générer la soumission PDF
+    </button>
+
+  </div>
+</div>
+
+
+<script>
+// ============================================================
+// PASSWORD
+// ============================================================
+const PASSWORD = "delux2025";
+
+function doLogin() {
+  const pw = document.getElementById('pw-input').value;
+  if (pw === PASSWORD) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initApp();
+  } else {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
+  }
+}
+
+function doLogout() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('pw-input').value = '';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+// ============================================================
+// PRICING CONSTANTS
+// ============================================================
+const PRICING = {
+  // Labor rates
+  laborDay: 200,        // 1 day, 1–2 workers (base for wash)
+  laborSandExtra: 0,    // sand is included in labor day base
+  laborSealerDay: 150,  // extra half-day for sealer
+  
+  // Materials per bag
+  sandBagCost: 40,      // SikaFast Fix ~0/bag
+  
+  // Chemicals
+  chemBase: 20,         // cleaning chemicals base
+  chemSealer: 80,       // sealer material cost (per job, scales slightly)
+
+  // Commission: 25% of TOTAL price
+  commissionRate: 0.25,
+
+  // Management fees (fixed add-on)
+  mgmtFees: 140,
+
+  // Minimum job price
+  minTotal: 650,
+};
+
+// Bag count scaling from reference jobs:
+// ~470 sqft = 6 bags (1/8" joints assumed)
+// ~900 sqft = 12 bags
+// ~850 sqft = 27 bags (wider joints)
+// ~1100 sqft = 35 bags
+// We'll use a simple linear: ~0.013 bags/sqft (1/8" joint default)
+function estimateBags(sqft) {
+  if (sqft <= 0) return 0;
+  // Based on SikaFast Fix chart: 1/8" joint = 64.5 sqft/bag
+  // Reference: 470 sqft → 6 bags = 78 sqft/bag ≈ close enough
+  const bags = Math.ceil(sqft / 65);
+  return Math.max(1, bags);
+}
+
+// ============================================================
+// ZONE MANAGEMENT
+// ============================================================
+let zones = [];
+let zoneCounter = 0;
+
+function addZone(name = '', sqft = '') {
+  const id = ++zoneCounter;
+  zones.push({ id, name, sqft });
+  renderZones();
+  updateCalc();
+}
+
+function removeZone(id) {
+  zones = zones.filter(z => z.id !== id);
+  renderZones();
+  updateCalc();
+}
+
+function renderZones() {
+  const container = document.getElementById('zones-list');
+  container.innerHTML = '';
+  zones.forEach((z, i) => {
+    const row = document.createElement('div');
+    row.className = 'zone-row';
+    row.innerHTML = `
+      <div class="zone-name">
+        <input type="text" placeholder="Ex: Entrée de garage" value="${z.name}"
+          oninput="zones[${i}].name=this.value; updateCalc()"
+          style="width:100%;padding:8px 12px;border:2px solid #dde1ea;border-radius:8px;font-size:14px;background:#f7f8fa;color:#1a2744;outline:none"
+          onfocus="this.style.borderColor='#c9a84c';this.style.background='white'"
+          onblur="this.style.borderColor='#dde1ea';this.style.background='#f7f8fa'">
+      </div>
+      <div class="zone-sqft">
+        <input type="number" placeholder="pi²" min="0" value="${z.sqft}"
+          oninput="zones[${i}].sqft=parseFloat(this.value)||0; updateCalc()"
+          onfocus="this.style.borderColor='#c9a84c';this.style.background='white'"
+          onblur="this.style.borderColor='#dde1ea';this.style.background='#f7f8fa'">
+      </div>
+      <button class="zone-del" onclick="removeZone(${z.id})" title="Supprimer">✕</button>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function toggleService(svc) {
+  const toggle = document.getElementById('toggle-' + svc);
+  const cb = document.getElementById('svc-' + svc);
+  toggle.classList.toggle('active', cb.checked);
+}
+
+// ============================================================
+// PRICING CALCULATION
+// ============================================================
+function calcPricing() {
+  const hasSand   = document.getElementById('svc-sand')   ? document.getElementById('svc-sand').checked   : false;
+  const hasWash   = document.getElementById('svc-wash')   ? document.getElementById('svc-wash').checked   : false;
+  const hasSealer = document.getElementById('svc-sealer') ? document.getElementById('svc-sealer').checked : false;
+
+  const totalSqft = zones.reduce((s, z) => s + (parseFloat(z.sqft) || 0), 0);
+  const bags = hasSand ? estimateBags(totalSqft) : 0;
+
+  // Direct costs
+  let labor = hasWash || hasSand ? PRICING.laborDay : 0;
+  if (hasSealer) labor += PRICING.laborSealerDay;
+
+  const sandMat = bags * PRICING.sandBagCost;
+  let chemicals = 0;
+  if (hasWash) chemicals += PRICING.chemBase;
+  if (hasSealer) chemicals += PRICING.chemSealer;
+
+  const directCosts = labor + sandMat + chemicals;
+
+  // Commission = 25% of total price
+  // total = directCosts + commission + mgmtFees
+  // commission = 0.25 * total
+  // total = directCosts + 0.25*total + mgmtFees
+  // 0.75*total = directCosts + mgmtFees
+  // total = (directCosts + mgmtFees) / 0.75
+  let total = (directCosts + PRICING.mgmtFees) / (1 - PRICING.commissionRate);
+  total = Math.max(total, PRICING.minTotal);
+
+  // Round to nearest 50
+  total = Math.ceil(total / 50) * 50;
+
+  const commission = total * PRICING.commissionRate;
+  const deposit = total / 2;
+  const balance = total - deposit;
+
+  return {
+    hasSand, hasWash, hasSealer,
+    totalSqft, bags,
+    labor, sandMat, chemicals, directCosts,
+    commission, mgmtFees: PRICING.mgmtFees,
+    total, deposit, balance,
+    crewDays: hasSealer ? 2 : 1
+  };
+}
+
+function fmt(n) {
+  return n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' $';
+}
+
+function updateCalc() {
+  const p = calcPricing();
+
+  document.getElementById('total-display').textContent = fmt(p.total);
+  document.getElementById('deposit-display').textContent = fmt(p.deposit);
+  document.getElementById('balance-display').textContent = fmt(p.balance);
+
+  // Zone summary
+  const zoneSummary = document.getElementById('zone-summary');
+  zoneSummary.innerHTML = '';
+  if (p.totalSqft > 0) {
+    zoneSummary.innerHTML = `
+      <div class="info-chip">📐 <strong>${p.totalSqft.toFixed(0)} pi²</strong> total</div>
+      ${p.hasSand ? `<div class="info-chip">🪨 <strong>${p.bags} sacs</strong> de sable</div>` : ''}
+      <div class="info-chip">👷 <strong>${p.crewDays} jour${p.crewDays > 1 ? 's' : ''}</strong> de travail</div>
+    `;
+  }
+
+  // Breakdown table
+  const bd = document.getElementById('price-breakdown');
+  let rows = '';
+  rows += `<tr class="section-header"><td colspan="2">Coûts directs</td></tr>`;
+  if (p.labor > 0)
+    rows += `<tr><td>Main-d'œuvre (${p.crewDays === 1 ? '1 journée' : '2 journées'}, 1–2 travailleurs)</td><td>${fmt(p.labor)}</td></tr>`;
+  if (p.hasSand && p.bags > 0)
+    rows += `<tr><td>Sable polymère – SikaFast Fix (${p.bags} sacs)</td><td>${fmt(p.sandMat)}</td></tr>`;
+  if (p.chemicals > 0)
+    rows += `<tr><td>Produits nettoyants & dégraissants${p.hasSealer ? ' + scellant acrylique' : ''}</td><td>${fmt(p.chemicals)}</td></tr>`;
+  rows += `<tr class="subtotal-row"><td>Total des coûts d'opération</td><td>${fmt(p.directCosts)}</td></tr>`;
+  rows += `<tr class="section-header"><td colspan="2">Frais de gestion & opérations</td></tr>`;
+  rows += `<tr><td>Commission & opérations / couverture de garantie</td><td>${fmt(p.commission)}</td></tr>`;
+  rows += `<tr><td>Frais de gestion</td><td>${fmt(p.mgmtFees)}</td></tr>`;
+  rows += `<tr class="total-row"><td>TOTAL</td><td>${fmt(p.total)}</td></tr>`;
+
+  bd.innerHTML = `<table class="price-table">${rows}</table>`;
+}
+
+function updatePreview() { /* real-time updates already handled */ }
+
+// ============================================================
+// PDF GENERATION
+// ============================================================
+// Logo is loaded from company-logo.png and converted to a data URL so html2canvas
+// (which renders the PDF) can use it without CORS issues, even when index.html is
+// opened via file://. The data URL is stored in LOGO_DATA once loaded.
+let LOGO_DATA = null;
+function preloadLogo() {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = function() {
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+    try { LOGO_DATA = c.toDataURL("image/png"); }
+    catch(e) { LOGO_DATA = img.src; /* fallback to raw src if tainted */ }
+  };
+  img.onerror = function() { LOGO_DATA = "company-logo.png"; };
+  img.src = "company-logo.png";
+}
+preloadLogo();
+
+// Color palette
+const C_NAVY  = [26, 39, 68];
+const C_GOLD  = [201, 168, 76];
+const C_SLATE = [85, 85, 85];
+const C_TEXT  = [55, 55, 55];
+const C_SMOKE = [247, 248, 250];
+const C_BORDER = [221, 225, 234];
+const C_WHITE = [255, 255, 255];
+
+// A4 page geometry (mm)
+const PG_W = 210, PG_H = 297;
+const M_L = 14, M_R = 14, M_T = 14, M_B = 12;
+const CONTENT_W = PG_W - M_L - M_R;
+
+function generatePDF() {
+  const clientName    = document.getElementById('client-name').value.trim();
+  const clientAddress = document.getElementById('client-address').value.trim();
+  const quoteDate     = document.getElementById('quote-date').value;
+  const clientNotes   = document.getElementById('client-notes').value.trim();
+
+  if (!clientName || !clientAddress) {
+    alert('Veuillez entrer le nom et l\'adresse du client.');
+    return;
+  }
+  if (zones.every(z => !z.sqft || z.sqft <= 0)) {
+    alert('Veuillez entrer la superficie d\'au moins une zone.');
+    return;
+  }
+
+  const p = calcPricing();
+
+  const dateStr = quoteDate
+    ? new Date(quoteDate + 'T12:00:00').toLocaleDateString('fr-CA', {year:'numeric', month:'long', day:'numeric'})
+    : new Date().toLocaleDateString('fr-CA', {year:'numeric', month:'long', day:'numeric'});
+
+  const crew = `1–2 travailleurs, ${p.crewDays} jour${p.crewDays > 1 ? 's' : ''}`;
+
+  const safeAddress = clientAddress.replace(/[^a-z0-9]/gi, '_').substring(0, 30);
+  const filename = `Saison_DeLux_Soumission_${safeAddress}.pdf`;
+
+  const btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Génération en cours...';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+    // ---- shorthand drawing helpers (capture pdf) ----
+    const fill  = c => pdf.setFillColor(c[0], c[1], c[2]);
+    const stroke= c => pdf.setDrawColor(c[0], c[1], c[2]);
+    const ink   = c => pdf.setTextColor(c[0], c[1], c[2]);
+    const font  = (size, weight = 'normal') => { pdf.setFont('helvetica', weight); pdf.setFontSize(size); };
+
+    let y = M_T;
+
+    // Track current page so footer can be added on every page at the end
+    const ensure = needed => {
+      if (y + needed > PG_H - M_B) {
+        pdf.addPage();
+        y = M_T;
+      }
+    };
+
+    // ====== HEADER ======
+    if (LOGO_DATA) {
+      try { pdf.addImage(LOGO_DATA, 'PNG', M_L, y, 18, 12); } catch (e) {}
+    }
+
+    font(20, 'bold'); ink(C_NAVY);
+    pdf.text('Saison DeLux', M_L + 21, y + 6);
+
+    font(8.5, 'bold'); ink(C_GOLD);
+    pdf.text('Exterior Restoration Services', M_L + 21, y + 10);
+
+    font(7, 'normal'); ink(C_SLATE);
+    pdf.text('Montréal & environs · Entièrement assuré · Équipement professionnel', M_L + 21, y + 13.5);
+
+    // SOUMISSION title (right)
+    font(26, 'bold'); ink(C_NAVY);
+    pdf.text('SOUMISSION', PG_W - M_R, y + 7, { align: 'right' });
+
+    font(8, 'normal'); ink(C_SLATE);
+    pdf.text(`Date : ${dateStr}`, PG_W - M_R, y + 12, { align: 'right' });
+    pdf.text('Valide 30 jours', PG_W - M_R, y + 16, { align: 'right' });
+
+    y += 22;
+
+    // Top divider
+    stroke(C_NAVY);
+    pdf.setLineWidth(0.7);
+    pdf.line(M_L, y, PG_W - M_R, y);
+    y += 5;
+
+    // ====== CLIENT BAR ======
+    const barRows = [
+      ['Client', clientName],
+      ['Adresse', clientAddress],
+      ['Superficie', `${p.totalSqft.toFixed(0)} pi²`],
+      ['Équipe', crew],
+    ];
+    if (clientNotes) barRows.push(['Notes', clientNotes]);
+
+    // Render in 2 lines of (up to) 4 entries each if there are notes
+    const barH = clientNotes ? 13 : 8.5;
+    fill(C_SMOKE); stroke(C_BORDER); pdf.setLineWidth(0.2);
+    pdf.roundedRect(M_L, y, CONTENT_W, barH, 1, 1, 'FD');
+
+    font(8, 'normal');
+    const colCount = 4;
+    const colW = CONTENT_W / colCount;
+    barRows.forEach((row, i) => {
+      const col = i % colCount;
+      const line = Math.floor(i / colCount);
+      const cellX = M_L + 3 + col * colW;
+      const cellY = y + 5.5 + line * 5;
+      ink(C_SLATE);
+      pdf.text(`${row[0]} : `, cellX, cellY);
+      const labelW = pdf.getTextWidth(`${row[0]} : `);
+      font(8, 'bold'); ink(C_NAVY);
+      const maxValW = colW - 6 - labelW;
+      const val = pdf.splitTextToSize(String(row[1]), maxValW)[0];
+      pdf.text(val, cellX + labelW, cellY);
+      font(8, 'normal');
+    });
+
+    y += barH + 7;
+
+    // ---- section title helper ----
+    const sectionTitle = (label) => {
+      ensure(10);
+      font(10, 'bold'); ink(C_NAVY);
+      pdf.text(label.toUpperCase(), M_L, y);
+      stroke(C_GOLD);
+      pdf.setLineWidth(0.6);
+      pdf.line(M_L, y + 1.8, PG_W - M_R, y + 1.8);
+      y += 7;
+    };
+
+    // ====== SCOPE OF WORK ======
+    sectionTitle('Étendue des travaux');
+
+    const scopeItems = [];
+    scopeItems.push({
+      title: 'Inspection et préparation du chantier',
+      body: 'Inspection de toutes les surfaces (entrée, trottoir, patio). Retrait des débris, feuilles et saletés. Protection des aménagements paysagers, fenêtres et portes adjacents. Identification des pavés endommagés, joints desserrés ou fissures avant le début des travaux.'
+    });
+    if (p.hasWash) {
+      scopeItems.push({
+        title: 'Prétraitement – Techniseal Patio & Deck Cleaner',
+        body: 'Application du nettoyant Techniseal Patio & Deck Cleaner sur toutes les surfaces en dur avant le lavage sous pression. Laissé agir selon les recommandations du fabricant. Décolle la saleté incrustée, la mousse, les algues, le lichen et les moisissures.'
+      });
+      scopeItems.push({
+        title: 'Nettoyage professionnel des surfaces',
+        body: 'Équipement de lavage sous pression de qualité commerciale avec brosse rotative. Élimine la saleté, les taches organiques, les algues, la moisissure, la décoloration de surface, les marques de pneus et les taches d\'huile (si possible). Finition uniforme, sans traînées, avec risque minimal de dommages.'
+      });
+      scopeItems.push({
+        title: 'Lavage sous pression de détail',
+        body: 'Tous les bords, coins, joints de dilatation, marches, bordures et zones difficiles d\'accès sont lavés à la pression avec des buses spécialisées pour une finition complète et uniforme.'
+      });
+    }
+    if (p.hasSand) {
+      scopeItems.push({
+        title: 'Traitement anti-mauvaises herbes',
+        body: 'Une fois les surfaces séchées, tous les joints de pavés sont traités avec une solution professionnelle de désherbage (Roundup ou équivalent) afin d\'éliminer les mauvaises herbes existantes et d\'inhiber leur repousse avant l\'installation du nouveau sable de jointement.'
+      });
+      scopeItems.push({
+        title: 'Préparation des joints',
+        body: 'Le matériau de joint desserré ou détérioré est retiré au besoin. Tous les joints sont nettoyés à fond pour assurer l\'installation et l\'adhérence adéquate du nouveau sable polymère.'
+      });
+      scopeItems.push({
+        title: 'Installation de sable polymère – SikaFast Fix',
+        body: `Le sable polymère premium est balayé dans tous les joints de pavés et compacté si nécessaire (${p.bags} sacs utilisés). Maintient les pavés en place, réduit la croissance des mauvaises herbes, décourage les insectes, minimise l'érosion. La surface est soufflée et légèrement vaporisée d'eau pour activer les liants polymères.`
+      });
+    }
+    if (p.hasSealer) {
+      scopeItems.push({
+        title: 'Application de scellant acrylique',
+        body: 'Application d\'un scellant acrylique de qualité professionnelle (wet-look). Protège les pavés contre les taches, l\'humidité, le gel-dégel et les UV. Rehausse les couleurs et donne une finition lustrée durable. Temps de séchage : 24–48 heures.'
+      });
+    }
+    scopeItems.push({
+      title: 'Inspection finale et nettoyage',
+      body: 'Nettoyage complet des zones environnantes. Retrait des matériaux excédentaires et des débris. Inspection finale de qualité effectuée. Visite guidée avec le client disponible sur demande.'
+    });
+
+    scopeItems.forEach((item, i) => {
+      font(8.5, 'bold'); ink(C_NAVY);
+      const titleText = `${i + 1}. ${item.title}`;
+      font(7.5, 'normal'); ink(C_TEXT);
+      const bodyLines = pdf.splitTextToSize(item.body, CONTENT_W);
+      const blockH = 4 + bodyLines.length * 3.2 + 2;
+      ensure(blockH);
+      font(8.5, 'bold'); ink(C_NAVY);
+      pdf.text(titleText, M_L, y);
+      y += 3.8;
+      font(7.5, 'normal'); ink(C_TEXT);
+      pdf.text(bodyLines, M_L, y);
+      y += bodyLines.length * 3.2 + 2.5;
+    });
+
+    y += 2;
+
+    // ====== COST TABLE ======
+    sectionTitle('Coûts directs du projet');
+
+    const costRows = [];
+    if (p.labor > 0)
+      costRows.push([`Main-d'œuvre (${p.crewDays === 1 ? '1 journée' : '2 journées'}, 1–2 travailleurs)`, '', fmt(p.labor), false]);
+    if (p.hasSand && p.bags > 0)
+      costRows.push(['Sable polymère – SikaFast Fix', `${p.bags} sacs`, fmt(p.sandMat), false]);
+    if (p.chemicals > 0)
+      costRows.push([`Produits nettoyants & dégraissants${p.hasSealer ? ' + scellant acrylique' : ''}`, '', fmt(p.chemicals), false]);
+    costRows.push(['Total des coûts d\'opération', '', fmt(p.directCosts), 'subtotal']);
+    costRows.push(['Commission & opérations / couverture de garantie', '', fmt(p.commission), false]);
+    costRows.push(['Frais de gestion', '', fmt(p.mgmtFees), false]);
+    costRows.push(['TOTAL', '', fmt(p.total), 'total']);
+
+    // Column widths
+    const colItem = CONTENT_W * 0.62;
+    const colQty  = CONTENT_W * 0.13;
+    const colAmt  = CONTENT_W * 0.25;
+    const colItemX = M_L;
+    const colQtyX  = M_L + colItem;
+    const colAmtX  = M_L + colItem + colQty;
+
+    // Header row
+    const headH = 7;
+    ensure(headH + costRows.length * 6 + 4);
+    fill(C_NAVY); pdf.rect(M_L, y, CONTENT_W, headH, 'F');
+    font(7.5, 'bold'); ink(C_WHITE);
+    pdf.text('ARTICLE', colItemX + 3, y + 4.7);
+    pdf.text('QTÉ', colQtyX + 3, y + 4.7);
+    pdf.text('COÛT ESTIMÉ', colAmtX + colAmt - 3, y + 4.7, { align: 'right' });
+    y += headH;
+
+    // Data rows
+    costRows.forEach(row => {
+      const [item, qty, amt, kind] = row;
+      const rowH = 6;
+      if (kind === 'subtotal') {
+        fill(C_SMOKE); pdf.rect(M_L, y, CONTENT_W, rowH, 'F');
+        font(8, 'bold'); ink(C_NAVY);
+      } else if (kind === 'total') {
+        fill(C_NAVY); pdf.rect(M_L, y, CONTENT_W, rowH + 1, 'F');
+        font(9.5, 'bold'); ink(C_WHITE);
+      } else {
+        font(8, 'normal'); ink(C_TEXT);
+      }
+      const textY = y + 4.1 + (kind === 'total' ? 0.5 : 0);
+      pdf.text(item, colItemX + 3, textY);
+      if (qty) pdf.text(qty, colQtyX + 3, textY);
+      pdf.text(amt, colAmtX + colAmt - 3, textY, { align: 'right' });
+      // separator
+      if (kind !== 'subtotal' && kind !== 'total') {
+        stroke([235, 235, 235]); pdf.setLineWidth(0.1);
+        pdf.line(M_L, y + rowH, PG_W - M_R, y + rowH);
+      }
+      y += rowH + (kind === 'total' ? 1 : 0);
+    });
+
+    y += 6;
+
+    // ====== PAYMENT TERMS ======
+    sectionTitle('Modalités de paiement');
+
+    const payH = 22;
+    ensure(payH);
+    const payColW = (CONTENT_W - 6) / 2;
+    const payCols = [
+      { title: 'Dépôt — à l\'acceptation', amount: fmt(p.deposit), note: 'Dû dès l\'acceptation écrite de la présente soumission.' },
+      { title: 'Solde — à la fin des travaux', amount: fmt(p.balance), note: 'Dû à la fin des travaux, avant le départ de l\'équipe.' },
+    ];
+    payCols.forEach((box, i) => {
+      const bx = M_L + i * (payColW + 6);
+      stroke(C_NAVY); pdf.setLineWidth(0.5);
+      pdf.roundedRect(bx, y, payColW, payH, 1.5, 1.5, 'S');
+      font(7.5, 'bold'); ink(C_GOLD);
+      pdf.text(box.title.toUpperCase(), bx + 4, y + 5);
+      font(16, 'bold'); ink(C_NAVY);
+      pdf.text(box.amount, bx + 4, y + 13);
+      font(7, 'normal'); ink(C_SLATE);
+      const noteLines = pdf.splitTextToSize(box.note, payColW - 8);
+      pdf.text(noteLines, bx + 4, y + 18);
+    });
+    y += payH + 8;
+
+    // ====== PAGE 2: WARRANTY ======
+    pdf.addPage();
+    y = M_T;
+
+    sectionTitle('Garantie');
+
+    const warranties = [];
+    if (p.hasWash) warranties.push({
+      title: 'Garantie 1 an – Lavage sous pression',
+      body: 'Pendant un (1) an à compter de la date d\'achèvement, Saison DeLux garantit que toutes les surfaces lavées seront exemptes de défauts liés à la technique de nettoyage. Ne couvre pas le resalissement naturel ou les dommages causés par des tiers.'
+    });
+    if (p.hasSand) warranties.push({
+      title: 'Garantie 2 ans – Joints de sable polymère',
+      body: 'Pendant deux (2) ans à compter de la date d\'achèvement, Saison DeLux garantit que les joints de sable polymère resteront intacts et exempts de défauts liés à une installation incorrecte. Ne couvre pas les dommages causés par le gel-dégel ou les racines.'
+    });
+    if (p.hasSealer) warranties.push({
+      title: 'Garantie 1 an – Scellant acrylique',
+      body: 'Pendant un (1) an à compter de la date d\'achèvement, Saison DeLux garantit l\'application du scellant acrylique contre tout défaut d\'application. Ne couvre pas l\'usure normale, l\'exposition aux UV ou les dommages mécaniques.'
+    });
+
+    if (warranties.length > 0) {
+      // 2-column grid; if odd count, last spans full width
+      const wColW = (CONTENT_W - 5) / 2;
+      let i = 0;
+      while (i < warranties.length) {
+        const left = warranties[i];
+        const right = warranties[i + 1];
+
+        font(7.5, 'normal');
+        const leftLines  = pdf.splitTextToSize(left.body, wColW - 6);
+        const rightLines = right ? pdf.splitTextToSize(right.body, wColW - 6) : [];
+        const blockH = Math.max(leftLines.length, rightLines.length) * 3 + 11;
+
+        ensure(blockH);
+
+        fill(C_SMOKE); stroke(C_BORDER); pdf.setLineWidth(0.2);
+        pdf.roundedRect(M_L, y, wColW, blockH, 1, 1, 'FD');
+        font(8, 'bold'); ink(C_NAVY);
+        pdf.text(left.title, M_L + 3, y + 5);
+        font(7.5, 'normal'); ink(C_SLATE);
+        pdf.text(leftLines, M_L + 3, y + 9);
+
+        if (right) {
+          const rx = M_L + wColW + 5;
+          fill(C_SMOKE); stroke(C_BORDER);
+          pdf.roundedRect(rx, y, wColW, blockH, 1, 1, 'FD');
+          font(8, 'bold'); ink(C_NAVY);
+          pdf.text(right.title, rx + 3, y + 5);
+          font(7.5, 'normal'); ink(C_SLATE);
+          pdf.text(rightLines, rx + 3, y + 9);
+        }
+        y += blockH + 3;
+        i += 2;
+      }
+      y += 4;
+    }
+
+    // ====== TERMS & CONDITIONS ======
+    sectionTitle('Termes et conditions');
+
+    const terms = [
+      'Un dépôt de 50 % est exigé dès l\'acceptation écrite de cette soumission. Le solde est dû à l\'achèvement des travaux.',
+      'La soumission est valide 30 jours à compter de la date d\'émission.',
+      'Le sable polymère ne peut être appliqué si de la pluie est prévue dans les 24 heures suivant l\'application — la planification peut être ajustée à la discrétion de l\'entrepreneur.',
+      'Le client est responsable de dégager les véhicules et objets mobiles de la zone de travail avant la date de début.',
+      'Les dommages préexistants aux pavés, aux services souterrains ou aux structures non divulgués avant le début des travaux sont exclus de la responsabilité de l\'entrepreneur.',
+    ];
+    font(7.5, 'normal'); ink(C_TEXT);
+    terms.forEach(t => {
+      const lines = pdf.splitTextToSize(t, CONTENT_W - 5);
+      ensure(lines.length * 3.2 + 2);
+      pdf.text('•', M_L, y);
+      pdf.text(lines, M_L + 3, y);
+      y += lines.length * 3.2 + 1.5;
+    });
+
+    y += 6;
+
+    // ====== SIGNATURES ======
+    sectionTitle('Signatures');
+
+    const sigH = 26;
+    ensure(sigH);
+    const sigColW = (CONTENT_W - 8) / 2;
+    [
+      { label: 'Signature du client', x: M_L },
+      { label: 'Entrepreneur – Saison DeLux', x: M_L + sigColW + 8 },
+    ].forEach(s => {
+      stroke(C_NAVY); pdf.setLineWidth(0.5);
+      pdf.line(s.x, y, s.x + sigColW, y);
+      font(7.5, 'normal'); ink(C_SLATE);
+      pdf.text(s.label, s.x, y + 4);
+      // signature line
+      stroke([180, 180, 180]); pdf.setLineWidth(0.2);
+      pdf.line(s.x, y + 17, s.x + sigColW, y + 17);
+      font(7, 'normal'); ink(C_SLATE);
+      pdf.text('Nom : ______________________________', s.x, y + 22);
+      pdf.text('Date : _____________', s.x + sigColW, y + 22, { align: 'right' });
+    });
+    y += sigH + 4;
+
+    // ====== FOOTER ======
+    ensure(8);
+    stroke([230, 230, 230]); pdf.setLineWidth(0.2);
+    pdf.line(M_L, PG_H - M_B + 2, PG_W - M_R, PG_H - M_B + 2);
+    font(7, 'normal'); ink([136, 136, 136]);
+    pdf.text(
+      'Merci de choisir Saison DeLux. Nous avons hâte de restaurer votre propriété.',
+      PG_W / 2, PG_H - M_B + 6,
+      { align: 'center' }
+    );
+
+    pdf.save(filename);
+  } catch (err) {
+    console.error(err);
+    alert('Erreur lors de la génération du PDF : ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '📄 Générer la soumission PDF';
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function initApp() {
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('quote-date').value = today;
+
+  // Default zones
+  zones = [];
+  zoneCounter = 0;
+  addZone('Entrée de garage', '');
+  addZone('Patio arrière', '');
+  updateCalc();
+}
+
+// Pre-check password on load (in case of browser autofill)
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('pw-input').focus();
+});
+</script>
+
+</body>
+</html>
