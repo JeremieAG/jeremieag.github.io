@@ -22,35 +22,8 @@
   }
   body { font-family: var(--font); background: var(--smoke); color: var(--navy); min-height: 100vh; }
 
-  /* ===== LOGIN SCREEN ===== */
-  #login-screen {
-    display: flex; align-items: center; justify-content: center;
-    min-height: 100vh; background: var(--navy);
-    flex-direction: column; gap: 24px;
-  }
-  #login-screen .lock-icon { font-size: 48px; }
-  #login-screen h1 { color: var(--gold); font-size: 24px; font-weight: 700; letter-spacing: 0.5px; }
-  #login-screen p { color: rgba(255,255,255,0.6); font-size: 14px; }
-  #login-box {
-    background: white; border-radius: 12px; padding: 32px; width: 320px;
-    display: flex; flex-direction: column; gap: 16px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
-  }
-  #login-box label { font-size: 13px; font-weight: 600; color: var(--navy); }
-  #login-box input {
-    width: 100%; padding: 12px 16px; border: 2px solid var(--border);
-    border-radius: 8px; font-size: 16px; outline: none; transition: border-color 0.2s;
-  }
-  #login-box input:focus { border-color: var(--gold); }
-  #login-btn {
-    background: var(--gold); color: var(--navy); font-weight: 700; font-size: 15px;
-    padding: 13px; border: none; border-radius: 8px; cursor: pointer; transition: background 0.2s;
-  }
-  #login-btn:hover { background: var(--gold-light); }
-  #login-error { color: var(--red); font-size: 13px; text-align: center; display: none; }
-
   /* ===== APP SHELL ===== */
-  #app { display: none; }
+  #app { display: block; }
   .app-header {
     background: var(--navy); color: white; padding: 0 24px;
     display: flex; align-items: center; justify-content: space-between;
@@ -204,21 +177,6 @@
 </head>
 <body>
 
-<!-- ===== LOGIN ===== -->
-<div id="login-screen">
-  <div class="lock-icon">🔐</div>
-  <h1>Saison DeLux</h1>
-  <p>Outil de soumission — Représentants</p>
-  <div id="login-box">
-    <div class="form-group">
-      <label>Mot de passe</label>
-      <input type="password" id="pw-input" placeholder="Entrez le mot de passe" onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <button id="login-btn" onclick="doLogin()">Accéder →</button>
-    <div id="login-error">Mot de passe incorrect. Réessayez.</div>
-  </div>
-</div>
-
 <!-- ===== APP ===== -->
 <div id="app">
   <div class="app-header">
@@ -228,7 +186,6 @@
         <div class="brand-sub">Outil de soumission</div>
       </div>
     </div>
-    <button id="logout-btn" onclick="doLogout()">Déconnexion</button>
   </div>
 
   <div class="main">
@@ -344,31 +301,6 @@
 
 
 <script>
-// ============================================================
-// PASSWORD
-// ============================================================
-const PASSWORD = "delux2025";
-
-function doLogin() {
-  const pw = document.getElementById('pw-input').value;
-  if (pw === PASSWORD) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    initApp();
-  } else {
-    document.getElementById('login-error').style.display = 'block';
-    document.getElementById('pw-input').value = '';
-    document.getElementById('pw-input').focus();
-  }
-}
-
-function doLogout() {
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('pw-input').value = '';
-  document.getElementById('login-error').style.display = 'none';
-}
-
 // ============================================================
 // PRICING CONSTANTS
 // ============================================================
@@ -998,9 +930,8 @@ function initApp() {
   updateCalc();
 }
 
-// Pre-check password on load (in case of browser autofill)
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('pw-input').focus();
+  initApp();
 });
 </script>
 
