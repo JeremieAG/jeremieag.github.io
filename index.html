@@ -306,25 +306,29 @@
 // ============================================================
 const PRICING = {
   // Labor rates
-  laborDay: 200,        // 1 day, 1–2 workers (base for wash)
-  laborSandExtra: 0,    // sand is included in labor day base
-  laborSealerDay: 150,  // extra half-day for sealer
-  
+  washLaborRatePerSqft: 0.15,   // per sqft: 900 sqft ≈ $400 to client
+  sandLaborRatePerSqft: 0.10,   // sand installation labor per sqft
+  sealerLaborRatePerSqft: 0.15, // sealer labor per sqft (through commission)
+  sealerMaterialRatePerSqft: 0.50, // sealer materials per sqft (face value)
+
+  // Crew day thresholds
+  sqftPerDay: 800,        // sqft a crew can wash/sand in a day
+  sqftPerSealerDay: 1000, // sqft a crew can seal in a day
+
   // Materials per bag
-  sandBagCost: 40,      // SikaFast Fix ~0/bag
-  
+  sandBagCost: 40,        // SikaFast Fix
+
   // Chemicals
-  chemBase: 20,         // cleaning chemicals base
-  chemSealer: 80,       // sealer material cost (per job, scales slightly)
+  chemBase: 20,           // cleaning chemicals base
 
   // Commission: 25% of TOTAL price
   commissionRate: 0.25,
 
-  // Management fees (fixed add-on)
-  mgmtFees: 140,
+  // Management fees: 15% of TOTAL price
+  mgmtFeeRate: 0.15,
 
   // Minimum job price
-  minTotal: 650,
+  minTotal: 350,
 };
 
 // Bag count scaling from reference jobs:
@@ -404,39 +408,43 @@ function calcPricing() {
   const bags = hasSand ? estimateBags(totalSqft) : 0;
 
   // Direct costs
-  let labor = hasWash || hasSand ? PRICING.laborDay : 0;
-  if (hasSealer) labor += PRICING.laborSealerDay;
+  const washLabor   = hasWash   ? PRICING.washLaborRatePerSqft   * totalSqft : 0;
+  const sandLabor   = hasSand   ? PRICING.sandLaborRatePerSqft   * totalSqft : 0;
+  const sealerLabor = hasSealer ? PRICING.sealerLaborRatePerSqft * totalSqft : 0;
+  const totalLabor  = washLabor + sandLabor + sealerLabor;
+  const sealerMat   = hasSealer ? PRICING.sealerMaterialRatePerSqft * totalSqft : 0;
 
-  const sandMat = bags * PRICING.sandBagCost;
-  let chemicals = 0;
-  if (hasWash) chemicals += PRICING.chemBase;
-  if (hasSealer) chemicals += PRICING.chemSealer;
+  const sandMat   = bags * PRICING.sandBagCost;
+  const chemicals = hasWash ? PRICING.chemBase : 0;
 
-  const directCosts = labor + sandMat + chemicals;
+  // sealerMat is billed at face value (outside commission formula)
+  const directCosts = totalLabor + sandMat + chemicals;
 
-  // Commission = 25% of total price
-  // total = directCosts + commission + mgmtFees
-  // commission = 0.25 * total
-  // total = directCosts + 0.25*total + mgmtFees
-  // 0.75*total = directCosts + mgmtFees
-  // total = (directCosts + mgmtFees) / 0.75
-  let total = (directCosts + PRICING.mgmtFees) / (1 - PRICING.commissionRate);
-  total = Math.max(total, PRICING.minTotal);
+  // commission (25%) + mgmtFees (15%) both scale with total
+  // total = directCosts / (1 - commissionRate - mgmtFeeRate)
+  let baseTotal = directCosts / (1 - PRICING.commissionRate - PRICING.mgmtFeeRate);
+  baseTotal = Math.max(baseTotal, PRICING.minTotal);
+  baseTotal = Math.ceil(baseTotal / 50) * 50;
+  const total = baseTotal + sealerMat;
 
-  // Round to nearest 50
-  total = Math.ceil(total / 50) * 50;
-
-  const commission = total * PRICING.commissionRate;
+  const commission = baseTotal * PRICING.commissionRate;
+  const mgmtFees  = baseTotal * PRICING.mgmtFeeRate;
   const deposit = total / 2;
   const balance = total - deposit;
+
+  // Crew days scale with sqft
+  const baseDays   = (hasWash || hasSand) ? Math.max(1, Math.ceil(totalSqft / PRICING.sqftPerDay)) : 0;
+  const sealerDays = hasSealer ? Math.max(1, Math.ceil(totalSqft / PRICING.sqftPerSealerDay)) : 0;
+  const crewDays   = Math.max(1, baseDays + sealerDays);
 
   return {
     hasSand, hasWash, hasSealer,
     totalSqft, bags,
-    labor, sandMat, chemicals, directCosts,
-    commission, mgmtFees: PRICING.mgmtFees,
+    washLabor, sandLabor, sealerLabor, totalLabor,
+    sandMat, chemicals, sealerMat, directCosts,
+    commission, mgmtFees,
     total, deposit, balance,
-    crewDays: hasSealer ? 2 : 1
+    crewDays, baseDays, sealerDays
   };
 }
 
@@ -466,13 +474,15 @@ function updateCalc() {
   const bd = document.getElementById('price-breakdown');
   let rows = '';
   rows += `<tr class="section-header"><td colspan="2">Coûts directs</td></tr>`;
-  if (p.labor > 0)
-    rows += `<tr><td>Main-d'œuvre (${p.crewDays === 1 ? '1 journée' : '2 journées'}, 1–2 travailleurs)</td><td>${fmt(p.labor)}</td></tr>`;
+  if (p.totalLabor > 0)
+    rows += `<tr><td>Main-d'œuvre (${p.crewDays} journée${p.crewDays > 1 ? 's' : ''}, 1–2 travailleurs)</td><td>${fmt(p.totalLabor)}</td></tr>`;
   if (p.hasSand && p.bags > 0)
     rows += `<tr><td>Sable polymère – SikaFast Fix (${p.bags} sacs)</td><td>${fmt(p.sandMat)}</td></tr>`;
   if (p.chemicals > 0)
-    rows += `<tr><td>Produits nettoyants & dégraissants${p.hasSealer ? ' + scellant acrylique' : ''}</td><td>${fmt(p.chemicals)}</td></tr>`;
-  rows += `<tr class="subtotal-row"><td>Total des coûts d'opération</td><td>${fmt(p.directCosts)}</td></tr>`;
+    rows += `<tr><td>Produits nettoyants & dégraissants</td><td>${fmt(p.chemicals)}</td></tr>`;
+  if (p.sealerMat > 0)
+    rows += `<tr><td>Matériaux – scellant acrylique (${p.totalSqft.toFixed(0)} pi²)</td><td>${fmt(p.sealerMat)}</td></tr>`;
+  rows += `<tr class="subtotal-row"><td>Total des coûts d'opération</td><td>${fmt(p.directCosts + p.sealerMat)}</td></tr>`;
   rows += `<tr class="section-header"><td colspan="2">Frais de gestion & opérations</td></tr>`;
   rows += `<tr><td>Commission & opérations / couverture de garantie</td><td>${fmt(p.commission)}</td></tr>`;
   rows += `<tr><td>Frais de gestion</td><td>${fmt(p.mgmtFees)}</td></tr>`;
@@ -712,13 +722,15 @@ function generatePDF() {
     sectionTitle('Coûts directs du projet');
 
     const costRows = [];
-    if (p.labor > 0)
-      costRows.push([`Main-d'œuvre (${p.crewDays === 1 ? '1 journée' : '2 journées'}, 1–2 travailleurs)`, '', fmt(p.labor), false]);
+    if (p.totalLabor > 0)
+      costRows.push([`Main-d'œuvre (${p.crewDays} journée${p.crewDays > 1 ? 's' : ''}, 1–2 travailleurs)`, '', fmt(p.totalLabor), false]);
     if (p.hasSand && p.bags > 0)
       costRows.push(['Sable polymère – SikaFast Fix', `${p.bags} sacs`, fmt(p.sandMat), false]);
     if (p.chemicals > 0)
-      costRows.push([`Produits nettoyants & dégraissants${p.hasSealer ? ' + scellant acrylique' : ''}`, '', fmt(p.chemicals), false]);
-    costRows.push(['Total des coûts d\'opération', '', fmt(p.directCosts), 'subtotal']);
+      costRows.push(['Produits nettoyants & dégraissants', '', fmt(p.chemicals), false]);
+    if (p.sealerMat > 0)
+      costRows.push([`Matériaux – scellant acrylique (${p.totalSqft.toFixed(0)} pi²)`, '', fmt(p.sealerMat), false]);
+    costRows.push(['Total des coûts d\'opération', '', fmt(p.directCosts + p.sealerMat), 'subtotal']);
     costRows.push(['Commission & opérations / couverture de garantie', '', fmt(p.commission), false]);
     costRows.push(['Frais de gestion', '', fmt(p.mgmtFees), false]);
     costRows.push(['TOTAL', '', fmt(p.total), 'total']);
